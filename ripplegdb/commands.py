@@ -32,7 +32,7 @@ def command(name="", class_=gdb.COMMAND_OBSCURE):
 
 ################################### COMMANDS ###################################
 
-@command('rl')
+@command('rlr')
 def reload_ripplegdb(arg, from_tty):
     import ripplegdb; ripplegdb.helpers.reload_module(ripplegdb)
 
@@ -50,9 +50,9 @@ def set_printer_status(value, from_tty):
     elif value:
         PP.on = value.lower() in ('1', 'on', 'true', 'yes')
 
-    print('enabled' if PP.on else 'disabled')
+    print('ripple-printers', 'enabled' if PP.on else 'disabled')
 
-@command('rpp')
+@command('trp')
 def toggle_ripple_printers(value, from_tty):
     gdb.execute('set ripple-printers toggle')
 

@@ -16,8 +16,8 @@ MODULE_LOAD_ORDER = '''\
 base58
 enums
 types
-values
 helpers
+values
 printers
 commands
 funcs

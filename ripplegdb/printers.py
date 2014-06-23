@@ -7,6 +7,8 @@ import re
 import struct
 import collections
 
+from decimal import Decimal
+
 # Gdb
 import gdb
 import gdb.types
@@ -14,7 +16,7 @@ import gdb.types
 # Ripplegdb
 
 from ripplegdb.base58 import base58_check_encode
-from ripplegdb.helpers import read_value, Proxy, hex_encode
+from ripplegdb.helpers import read_value, Proxy, hex_encode, moneyfmt
 from ripplegdb.types import TYPE_MAPPINGS, serialized_type_ptr
 
 ################################### REGISTRY ###################################
@@ -70,7 +72,7 @@ def pUint160(val, currency=False, read_value=read_value):
     else:
         return base58_check_encode(bytes(d))
 
-pcurrency = functools.partial(pUint160, currency=True)
+pCurrency = functools.partial(pUint160, currency=True)
 pAccountID = functools.partial(pUint160, currency=False)
 
 def pSTAccount(val):
@@ -83,13 +85,8 @@ def pUintAll(val, read_value=read_value):
 def pstd_string(val):
     return val['_M_dataplus']['_M_p'].string()
 
-def pSTAmount(val):
-    '''
 
-    We calculate a float creating a constructor string, rather than doing
-    calculations, that way we don't lose any accuracy.
-
-    '''
+def STAmount_to_decimal(val):
     is_native   = val['mIsNative']
     is_negative = val['mIsNegative']
     mantissa    = val['mValue']
@@ -98,11 +95,27 @@ def pSTAmount(val):
 
     # build up a list of the components
     # ${sign}${mantissa}e$exponent
-    v = float(''.join(map(str, [sign, mantissa, 'e', exponent])))
+    v = Decimal(''.join(map(str, [sign, mantissa, 'e', exponent])))
+
+    return v
+
+def format_decimal(d):
+    return str(d)
+    return "%32f" % d
+    return moneyfmt(d, places=32)
+
+def pSTAmount(val):
+    '''
+
+    We calculate a float creating a constructor string, rather than doing
+    calculations, that way we don't lose any accuracy.
+
+    '''
+    v = format_decimal(STAmount_to_decimal(val))
 
     field    = pstd_string(val['fName']['rawJsonName'])
-    currency = pUint160(val['mCurrency'], currency=True)
-    issuer   = pUint160(val['mIssuer'])
+    currency = pCurrency(val['mCurrency'])
+    issuer   = pAccountID(val['mIssuer'])
 
     if currency == 'XRP':
         ret = "%s/XRP%s" % (v, '' if issuer == '0' else issuer)
@@ -127,7 +140,7 @@ PathState %(mIndex)s:
         pass:%(saOutPass)s
     nodes:
         %(nodes_)s
-""" % Proxy(val, uQuality=pQuality)
+""" % Proxy(val, uQuality=pQuality, saInReq=lambda v: v)
 
 def path_state_flags(val):
     flags = int(to_str(val))
@@ -178,7 +191,7 @@ def pNode(val):
 
 """ % Proxy(val,
         sleOffer=node_offer,
-        currency_=pcurrency,
+        currency_=pCurrency,
         uFlags=path_state_flags)
 
 
@@ -188,22 +201,24 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
     aliases = {
         'ripple::uint160' : pUint160,
         'ripple::Account' : pAccountID,
-        'ripple::Currency' : pcurrency,
+        'ripple::Currency' : pCurrency,
+        'ripple::path::Account' : pAccountID,
+        'ripple::path::Currency' : pCurrency,
+
         'ripple::uint256' : pUintAll,
 
         'ripple::STAmount':   pSTAmount,
-        'ripple::STAccount':  lambda o: pAccountID(o['value']),
+        'ripple::STAccount':  pSTAccount,
         'ripple::STHash256':  lambda o: pUintAll(o['value']),
         'ripple::STHash160':  lambda o: pUint160(o['value']),
         'ripple::STHash128':  lambda o: pUintAll(o['value']),
-
-        'ripple::STAccount':  pSTAccount,
-        'ripple::SerializedLedgerEntry':  pLedgerEntry,
 
         'ripple::STUInt8':  lambda o: o['value'],
         'ripple::STUInt16':  lambda o: o['value'],
         'ripple::STUInt32':  lambda o: o['value'],
         'ripple::STUInt64':  lambda o: ("{0:0{1}x}".format(int(o['value']), 16)),
+
+        'ripple::SerializedLedgerEntry':  pLedgerEntry,
 
         'ripple::PathState':  pPathState,
         'ripple::path::Node': pNode
@@ -230,7 +245,11 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
 
     def __call__(self, val):
         if not RipplePrinter.on: return
+        # print("---- RipplePrinter ----")
+
         for typename, value in self.try_types(val):
+            # print("typename", typename)
+
             if typename is not None:
                 ripple_type = typename
                 fn = self.aliases.get(ripple_type)

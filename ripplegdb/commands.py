@@ -42,7 +42,8 @@ def reload_ripplegdb(arg, from_tty):
 
 @command('ipy')
 def launch_ipython(arg, from_tty):
-    import IPython; IPython.embed()
+    import IPython
+    IPython.embed()
 
 @command('set ripple-printers')
 def set_printer_status(value, from_tty):
@@ -63,38 +64,3 @@ def toggle_ripple_printers(value, from_tty):
 @command('reset_term')
 def toggle_ripple_printers(value, from_tty):
     os.system('reset')
-
-def deep_items (type_):
-    """Return an iterator that recursively traverses anonymous fields.
-
-    Arguments:
-        type_: The type to traverse.  It should be one of
-        gdb.TYPE_CODE_STRUCT or gdb.TYPE_CODE_UNION.
-
-    Returns:
-        an iterator similar to gdb.Type.iteritems(), i.e., it returns
-        pairs of key, value, but for any anonymous struct or union
-        field that field is traversed recursively, depth-first.
-    """
-    for k, v in type_.items ():
-        if k:
-            yield k, v
-            if v.is_base_class and v.type: #and (v.type.code in (3,4))
-                for i in deep_items (v.type):
-                    yield i
-        else:
-            for i in deep_items (v.type):
-                yield i
-
-@command()
-def pmembers(arg, from_tty):
-    init = gdb.parse_and_eval(arg)
-    path, val = ripplegdb.values.deref(init)
-    print ("%s.keys() = %s" % (arg, pf(init.type.keys())))
-    print (init.type)
-    if path:
-        pp(list(deep_items(val.type)))
-        print ("%s.keys() = %s" % (''.join([arg]+path), pf(val.type.keys())))
-    else:
-        pp(list(deep_items(init.type)))
-

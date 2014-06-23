@@ -16,6 +16,8 @@ uint32 = gdb.lookup_type("ripple::STUInt32")
 uint16 = gdb.lookup_type("ripple::STUInt16")
 uint8 = gdb.lookup_type("ripple::STUInt8")
 
+VL = gdb.lookup_type("ripple::STVariableLength")
+
 amount_ptr = amount.pointer()
 hash256_ptr = hash256.pointer()
 hash160_ptr = hash160.pointer()
@@ -25,6 +27,7 @@ uint64_ptr = uint64.pointer()
 uint32_ptr = uint32.pointer()
 uint16_ptr = uint16.pointer()
 uint8_ptr = uint8.pointer()
+VL_ptr = VL.pointer()
 serialized_type_ptr = serialized_type.pointer()
 
 TYPE_MAPPINGS = {
@@ -35,5 +38,13 @@ TYPE_MAPPINGS = {
     'ripple::STI_UINT8' :   uint8_ptr,
     'ripple::STI_UINT16' :  uint16_ptr,
     'ripple::STI_UINT32' :  uint32_ptr,
-    'ripple::STI_UINT64' :  uint64_ptr
+    'ripple::STI_UINT64' :  uint64_ptr,
+    'ripple::STI_VL' :  VL_ptr
 }
+
+
+CODE_LOOKUP = dict([ (getattr(gdb, k), k) for k in dir(gdb) if 
+                   k.startswith('TYPE_CODE_')])
+
+def lookup_code(c):
+    return CODE_LOOKUP[c]

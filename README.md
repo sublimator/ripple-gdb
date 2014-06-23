@@ -9,9 +9,8 @@
 #### Option 1
 
 ```
-sudo apt-get install python3-setuptools
-sudo apt-get install python3-pip
-sudo pip3 install git+https://github.com/sublimator/ripple-gdb.git
+sudo apt-get install python3-setuptools python3-pip
+sudo pip3 install --upgrade git+https://github.com/sublimator/ripple-gdb.git
 ```
 
 #### Option 2 (develop mode)

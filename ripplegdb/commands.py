@@ -19,7 +19,7 @@ PP = ripplegdb.printers.RipplePrinter
 
 def apply(f): return f()
 
-def command(name="", class_=gdb.COMMAND_OBSCURE):
+def command(name='', class_=gdb.COMMAND_OBSCURE):
     def from_func(f):
         class Command(gdb.Command):
             def __init__(self):
@@ -70,12 +70,12 @@ def launch_ipython():
 @command('set ripple-printers')
 def set_printer_status(value, from_tty):
     'Enable pretty printers for ripple types when using (p)rint'
-    value = value.strip()
+    value = value.strip().lower()
 
     if value == 'toggle':
         PP.on = not PP.on
     elif value:
-        PP.on = value.lower() in ('1', 'on', 'true', 'yes')
+        PP.on = value in ('1', 'on', 'true', 'yes')
 
     print('ripple-printers', 'enabled' if PP.on else 'disabled')
 

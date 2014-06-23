@@ -17,6 +17,8 @@ PP = ripplegdb.printers.RipplePrinter
 
 ################################################################################
 
+def apply(f): return f()
+
 def command(name="", class_=gdb.COMMAND_OBSCURE):
     def from_func(f):
         class Command(gdb.Command):
@@ -33,17 +35,37 @@ def command(name="", class_=gdb.COMMAND_OBSCURE):
 ################################### COMMANDS ###################################
 
 @command('rlr')
-def reload_ripplegdb(arg, from_tty):
+def reload_ripplegdb(arg=None, from_tty=None):
     try:
         ripplegdb.helpers.reload_module(ripplegdb)
     except:
         delattr(ripplegdb, 'hook_remover')
         ripplegdb.helpers.reload_module(ripplegdb)
 
-@command('ipy')
-def launch_ipython(arg, from_tty):
-    import IPython
-    IPython.embed()
+@apply
+def launch_ipython():
+    try: import IPython
+    except ImportError: return
+
+    user_ns= dict (
+        rl=reload_ripplegdb,
+        luc=ripplegdb.types.lookup_code,
+        rv=ripplegdb.values.read_value,
+        # You can add whatever to here ;)
+        # h = some.longarse.dotted.path,
+    )
+
+    ti = IPython.terminal.embed.InteractiveShellEmbed._instance
+    if ti is not None:
+        for k,v in user_ns.items():
+            # fresh meat
+            ti.user_ns[k] = v
+
+    @command('ipy')
+    def launch_ipython(arg, from_tty):
+        IPython.embed(user_ns=user_ns, user_module=ripplegdb)
+
+    return launch_ipython
 
 @command('set ripple-printers')
 def set_printer_status(value, from_tty):

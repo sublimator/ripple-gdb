@@ -34,7 +34,11 @@ def command(name="", class_=gdb.COMMAND_OBSCURE):
 
 @command('rlr')
 def reload_ripplegdb(arg, from_tty):
-    ripplegdb.helpers.reload_module(ripplegdb)
+    try:
+        ripplegdb.helpers.reload_module(ripplegdb)
+    except:
+        delattr(ripplegdb, 'hook_remover')
+        ripplegdb.helpers.reload_module(ripplegdb)
 
 @command('ipy')
 def launch_ipython(arg, from_tty):

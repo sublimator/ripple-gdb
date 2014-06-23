@@ -50,7 +50,7 @@ def pQuality(val):
     (rate, ) = struct.unpack_from("Q", read_value(val))
     mantissa = rate & ~ (0xFF << (64 - 8))
     exponent = (rate >> (64 - 8)) - 100
-    quality  = mantissa * (10. ** exponent)
+    quality  = float("%se%s" % (mantissa, exponent))
     return str(quality)
 
 @register
@@ -135,50 +135,49 @@ def path_state_flags(val):
     human = '|'.join(k for k in sorted(yeah) if flags & yeah[k])
     return human
 
+def iterate_stobject_fields(val):
+    vec_impl = val['mData']['c_']['_M_impl']
+    start = vec_impl['_M_start']
 
-def ledger_entry_fields(val):
-    fields = dict()
+    for i in range(int(vec_impl['_M_finish'] - start)):
+        ptr = start + i
+        st_ptr = ptr.dereference().cast(serialized_type_ptr)
+        field = st_ptr.dereference()['fName'].dereference()
+        sub_ptr = TYPE_MAPPINGS.get(str(field['fieldType']))
 
-    val = val['_M_ptr']
+        if sub_ptr is not None:
+            dcasted = st_ptr.dynamic_cast(sub_ptr)
+            casted = st_ptr.cast(sub_ptr)
+            if dcasted != 0 and casted != 0:
+                fieldName = pstd_string(field['fieldName'])
+                yield (fieldName, casted.dereference())
 
-    if val != 0:
-        offer = val = val.dereference()
-        vec_impl = val['mData']['c_']['_M_impl']
-
-        start = vec_impl['_M_start']
-        for i in range(int(vec_impl['_M_finish'] - start)):
-            derp = start + i
-            val = derp.dereference().cast(serialized_type_ptr)
-
-            field = val.dereference()['fName'].dereference()
-            sub_ptr = TYPE_MAPPINGS.get(str(field['fieldType']))
-
-            if sub_ptr is not None:
-                dcasted = val.dynamic_cast(sub_ptr)
-                casted = val.cast(sub_ptr)
-                if dcasted != 0:
-                    fieldName = str(field['fieldName'])[1:-1]
-                    fields[fieldName] = casted
-            else:
-                fields[str(field['fieldName'])] = val.dereference()["_vptr.SerializedType"].dereference()
-    return fields
+def pLedgerEntry(val):
+    if val.address == 0:
+        return
+    else:
+        fields = sorted(iterate_stobject_fields(val))
+        return '\n'.join("%-20s%s" % (k+':',v) for (k,v) in fields )
 
 def pLedgerEntryPointer(val):
-    fields = ledger_entry_fields(val)
-    if fields:
-        return '\n'.join("%-20s%s" % (k+':',v.dereference()) for (k,v) in sorted(fields.items()) if v != 0)
-    return ''
+    return pLedgerEntry(val['_M_ptr'].dereference())
+
+def node_offer(val):
+    v = pLedgerEntryPointer(val)
+    if v:
+        return '\n\t' + v.replace('\n', '\n\t')
+    else:
+        return '<empty>'
 
 def pNode(val):
     return """
         t: %(uFlags)s
         a: %(account_)s
       c/i: %(currency_)s/%(issuer_)s
-
       ofr: %(offerIndex_)s %(sleOffer)s
-      
+
 """ % Proxy(val,
-        sleOffer=lambda v: '\n\t' + pLedgerEntryPointer(v).replace('\n', '\n\t'),
+        sleOffer=node_offer,
         currency_=pcurrency,
         uFlags=path_state_flags)
 
@@ -187,18 +186,19 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
     on = True
 
     aliases = {
-        'ripple::base_uint<160ul, void>' : pUint160,
-        'ripple::base_uint<160ul, ripple::core::detail::AccountTag>' : pAccountID,
-        'ripple::base_uint<160ul, ripple::core::detail::CurrencyTag>' : pcurrency,
-        'ripple::base_uint<256ul, void>' : pUintAll,
+        'ripple::uint160' : pUint160,
+        'ripple::Account' : pAccountID,
+        'ripple::Currency' : pcurrency,
+        'ripple::uint256' : pUintAll,
+
         'ripple::STAmount':   pSTAmount,
-        # 'ripple::STAccount':   pAccountID,
+        'ripple::STAccount':  lambda o: pAccountID(o['value']),
         'ripple::STHash256':  lambda o: pUintAll(o['value']),
         'ripple::STHash160':  lambda o: pUint160(o['value']),
         'ripple::STHash128':  lambda o: pUintAll(o['value']),
 
         'ripple::STAccount':  pSTAccount,
-        'ripple::SerializedLedgerEntry::pointer':  pLedgerEntryPointer,
+        'ripple::SerializedLedgerEntry':  pLedgerEntry,
 
         'ripple::STUInt8':  lambda o: o['value'],
         'ripple::STUInt16':  lambda o: o['value'],
@@ -216,27 +216,29 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         (fn, ) = self.fn
         return fn(self.val)
 
+    def try_types(self, val):
+        def fancy():
+            t = val.type
+            yield t.name, val
+
+            if t.code == gdb.TYPE_CODE_PTR:
+                yield t.target().name, val.dereference()
+
+            yield gdb.types.get_basic_type(t).tag, val
+
+        yield from ((k,v) for (k,v) in fancy() if k is not None)
+
     def __call__(self, val):
         if not RipplePrinter.on: return
-
-        typename = gdb.types.get_basic_type(val.type).tag
-        # print("typename", typename, val.type.name)
-
-        if re.match(b"ripple::.*? \*$", to_str(val.type)):
-            val = val.dereference()
-            typename = str(val.type)
-
-        if val.type.name in self.aliases and not typename in self.aliases:
-            typename = val.type.name
-
-        if typename is not None and typename.startswith('ripple::'):
-            ripple_type = typename
-            fn = self.aliases.get(ripple_type)
-            self.fn = (fn, )
-            self.val = val
-            if fn is not None:
-                return self
-            else:
-                pass
+        for typename, value in self.try_types(val):
+            if typename is not None:
+                ripple_type = typename
+                fn = self.aliases.get(ripple_type)
+                self.fn = (fn, )
+                self.val = val
+                if fn is not None:
+                    return self
+                else:
+                    pass
 
 gdb.printing.register_pretty_printer(None, RipplePrinter(), replace=True)

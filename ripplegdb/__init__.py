@@ -4,7 +4,12 @@
 import os
 import importlib
 
+#################################### VERSION ###################################
+
+__version__ = '0.0.1'
+
 ################################### CONSTANTS ##################################
+
 
 # Dependency (stable) sorted, ie. don't introduce circular idiocy
 MODULE_LOAD_ORDER = '''\
@@ -41,8 +46,10 @@ def init():
     from ripplegdb.libcpp import register_libstdcxx_printers
     from ripplegdb.helpers import on_rippled_loaded
 
-    try:    hook_remover()
+    try: hook_remover()
     except NameError: pass
+    except Exception as e:
+        print('warning: ', e)
 
     @on_rippled_loaded(once=False)
     def hook_remover(rippled_objfile):
@@ -65,5 +72,3 @@ except ImportError as e:
     pass
 else:
     init()
-finally:
-    __version__ = '0.0.1'

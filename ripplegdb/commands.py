@@ -34,7 +34,7 @@ def command(name="", class_=gdb.COMMAND_OBSCURE):
 
 @command('rlr')
 def reload_ripplegdb(arg, from_tty):
-    import ripplegdb; ripplegdb.helpers.reload_module(ripplegdb)
+    ripplegdb.helpers.reload_module(ripplegdb)
 
 @command('ipy')
 def launch_ipython(arg, from_tty):
@@ -93,4 +93,4 @@ def pmembers(arg, from_tty):
         print ("%s.keys() = %s" % (''.join([arg]+path), pf(val.type.keys())))
     else:
         pp(list(deep_items(init.type)))
-        
+

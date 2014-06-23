@@ -15,7 +15,7 @@ import gdb.types
 
 from ripplegdb.base58 import base58_check_encode
 from ripplegdb.helpers import read_value, Proxy, hex_encode
-from ripplegdb.types import TYPE_MAPPINGS
+from ripplegdb.types import TYPE_MAPPINGS, serialized_type_ptr
 
 ################################### REGISTRY ###################################
 
@@ -84,16 +84,28 @@ def pstd_string(val):
     return val['_M_dataplus']['_M_p'].string()
 
 def pSTAmount(val):
-    # return val
-    v = int(val['mValue']) * (10. ** int(val['mOffset']))
-    if val['mIsNegative']: v = -v
+    '''
+
+    We calculate a float creating a constructor string, rather than doing
+    calculations, that way we don't lose any accuracy.
+
+    '''
+    is_native   = val['mIsNative']
+    is_negative = val['mIsNegative']
+    mantissa    = val['mValue']
+    exponent    = -6 if is_native else int(val['mOffset'])
+    sign        = '-' if is_negative else '+'
+
+    # build up a list of the components
+    # ${sign}${mantissa}e$exponent
+    v = float(''.join(map(str, [sign, mantissa, 'e', exponent])))
 
     field    = pstd_string(val['fName']['rawJsonName'])
     currency = pUint160(val['mCurrency'], currency=True)
     issuer   = pUint160(val['mIssuer'])
 
     if currency == 'XRP':
-        ret = "%s/XRP%s" % (v / 1e6, '' if issuer == '0' else issuer)
+        ret = "%s/XRP%s" % (v, '' if issuer == '0' else issuer)
     else:
         ret = "%s/%s/%s" % (v, currency, issuer)
 
@@ -134,56 +146,50 @@ def ledger_entry_fields(val):
         vec_impl = val['mData']['c_']['_M_impl']
 
         start = vec_impl['_M_start']
-        for i in range(vec_impl['_M_finish'] - start):
+        for i in range(int(vec_impl['_M_finish'] - start)):
             derp = start + i
-            val = derp.dereference().cast(ST.ptr)
+            val = derp.dereference().cast(serialized_type_ptr)
 
             field = val.dereference()['fName'].dereference()
-            sub_ptr = TYPE_MAPPINGS.get(to_str(field['fieldType']))
+            sub_ptr = TYPE_MAPPINGS.get(str(field['fieldType']))
 
             if sub_ptr is not None:
                 dcasted = val.dynamic_cast(sub_ptr)
                 casted = val.cast(sub_ptr)
                 if dcasted != 0:
-                    fields[to_str(field['fieldName'])] = casted
+                    fieldName = str(field['fieldName'])[1:-1]
+                    fields[fieldName] = casted
             else:
-                fields[to_str(field['fieldName'])] = val.dereference()["_vptr.SerializedType"].dereference()
+                fields[str(field['fieldName'])] = val.dereference()["_vptr.SerializedType"].dereference()
     return fields
 
-def pOffer(val):
+def pLedgerEntryPointer(val):
     fields = ledger_entry_fields(val)
     if fields:
-        return '\n\t' + '\n\t'.join("%s=%s" % (k,v.dereference()) for (k,v) in list(fields.items()) if v != 0)
-    return 'pOffer'
+        return '\n'.join("%-20s%s" % (k+':',v.dereference()) for (k,v) in sorted(fields.items()) if v != 0)
+    return ''
 
 def pNode(val):
     return """
         t: %(uFlags)s
-        a: %(uAccountID)s
-      c/i: %(uCurrencyID)s/%(uIssuerID)s
-      
-      ofr: %(uOfferIndex)s %(sleOffer)s 
+        a: %(account_)s
+      c/i: %(currency_)s/%(issuer_)s
+
+      ofr: %(offerIndex_)s %(sleOffer)s
       
 """ % Proxy(val,
-        sleOffer=pOffer,
-        uCurrencyID=pcurrency,
+        sleOffer=lambda v: '\n\t' + pLedgerEntryPointer(v).replace('\n', '\n\t'),
+        currency_=pcurrency,
         uFlags=path_state_flags)
 
-# class UseRipplePrinters(gdb.parameters.Parameter):
-#     def __init__(self):
-#         super(UseRipplePrinters, self).__init__('ripple-print', gdb.COMMAND_OBSCURE, gdb.PARAM_ENUM, ['on', 'off'])
-#         self.value = 'on'
-
-#     def get_set_string(self):
-#         print(self.value)
-
-# UseRipplePrinters()
 
 class RipplePrinter(gdb.printing.PrettyPrinter):
     on = True
 
     aliases = {
         'ripple::base_uint<160ul, void>' : pUint160,
+        'ripple::base_uint<160ul, ripple::core::detail::AccountTag>' : pAccountID,
+        'ripple::base_uint<160ul, ripple::core::detail::CurrencyTag>' : pcurrency,
         'ripple::base_uint<256ul, void>' : pUintAll,
         'ripple::STAmount':   pSTAmount,
         # 'ripple::STAccount':   pAccountID,
@@ -192,6 +198,7 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::STHash128':  lambda o: pUintAll(o['value']),
 
         'ripple::STAccount':  pSTAccount,
+        'ripple::SerializedLedgerEntry::pointer':  pLedgerEntryPointer,
 
         'ripple::STUInt8':  lambda o: o['value'],
         'ripple::STUInt16':  lambda o: o['value'],
@@ -213,10 +220,14 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         if not RipplePrinter.on: return
 
         typename = gdb.types.get_basic_type(val.type).tag
+        # print("typename", typename, val.type.name)
 
         if re.match(b"ripple::.*? \*$", to_str(val.type)):
             val = val.dereference()
             typename = str(val.type)
+
+        if val.type.name in self.aliases and not typename in self.aliases:
+            typename = val.type.name
 
         if typename is not None and typename.startswith('ripple::'):
             ripple_type = typename

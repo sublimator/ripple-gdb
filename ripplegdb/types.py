@@ -4,45 +4,41 @@ import gdb
 
 ################################### CONSTANTS ##################################
 
-serialized_type = gdb.lookup_type("ripple::SerializedType")
+SerializedType = gdb.lookup_type("ripple::SerializedType")
 
-amount = gdb.lookup_type("ripple::STAmount")
-hash256 = gdb.lookup_type("ripple::STHash256")
-hash160 = gdb.lookup_type("ripple::STHash160")
-accountVl = gdb.lookup_type("ripple::STAccount")
-hash128 = gdb.lookup_type("ripple::STHash128")
-uint64 = gdb.lookup_type("ripple::STUInt64")
-uint32 = gdb.lookup_type("ripple::STUInt32")
-uint16 = gdb.lookup_type("ripple::STUInt16")
-uint8 = gdb.lookup_type("ripple::STUInt8")
+STAmount = gdb.lookup_type("ripple::STAmount")
+STHash256 = gdb.lookup_type("ripple::STHash256")
+STHash160 = gdb.lookup_type("ripple::STHash160")
+STAccount = gdb.lookup_type("ripple::STAccount")
+STHash128 = gdb.lookup_type("ripple::STHash128")
+STUInt64 = gdb.lookup_type("ripple::STUInt64")
+STUInt32 = gdb.lookup_type("ripple::STUInt32")
+STUInt16 = gdb.lookup_type("ripple::STUInt16")
+STUInt8 = gdb.lookup_type("ripple::STUInt8")
+STObject  =  gdb.lookup_type('ripple::STObject')
+STArray  =  gdb.lookup_type('ripple::STArray')
+STPathSet  =  gdb.lookup_type('ripple::STPathSet')
+STVector256  =  gdb.lookup_type('ripple::STVector256')
+STVariableLength = gdb.lookup_type("ripple::STVariableLength")
 
-VL = gdb.lookup_type("ripple::STVariableLength")
-
-amount_ptr = amount.pointer()
-hash256_ptr = hash256.pointer()
-hash160_ptr = hash160.pointer()
-accountVl_ptr = accountVl.pointer()
-hash128_ptr = hash128.pointer()
-uint64_ptr = uint64.pointer()
-uint32_ptr = uint32.pointer()
-uint16_ptr = uint16.pointer()
-uint8_ptr = uint8.pointer()
-VL_ptr = VL.pointer()
-serialized_type_ptr = serialized_type.pointer()
-
-TYPE_MAPPINGS = {
-    'ripple::STI_AMOUNT' :  amount_ptr,
-    'ripple::STI_HASH160' : hash160_ptr,
-    'ripple::STI_ACCOUNT' : accountVl_ptr,
-    'ripple::STI_HASH256' : hash256_ptr,
-    'ripple::STI_UINT8' :   uint8_ptr,
-    'ripple::STI_UINT16' :  uint16_ptr,
-    'ripple::STI_UINT32' :  uint32_ptr,
-    'ripple::STI_UINT64' :  uint64_ptr,
-    'ripple::STI_VL' :  VL_ptr
+STI_TO_TYPE_MAPPING = {
+    'ripple::STI_UINT8':     STUInt8,
+    'ripple::STI_UINT32':    STUInt32,
+    'ripple::STI_UINT16':    STUInt16,
+    'ripple::STI_UINT64':    STUInt64,
+    'ripple::STI_HASH128':   STHash128,
+    'ripple::STI_HASH160':   STHash160,
+    'ripple::STI_HASH256':   STHash256,
+    'ripple::STI_AMOUNT':    STAmount,
+    'ripple::STI_ACCOUNT':   STAccount,
+    'ripple::STI_VL':        STVariableLength,
+    'ripple::STI_OBJECT':    STObject,
+    'ripple::STI_ARRAY':     STArray,
+    'ripple::STI_PATHSET' :  STPathSet,
+    'ripple::STI_VECTOR256': STVector256
 }
 
-CODE_LOOKUP = dict([ (getattr(gdb, k), k) for k in dir(gdb) if 
+CODE_LOOKUP = dict([ (getattr(gdb, k), k) for k in dir(gdb) if
                    k.startswith('TYPE_CODE_')])
 
 def lookup_code(c):

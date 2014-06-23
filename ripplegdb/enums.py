@@ -24,3 +24,6 @@ ripple_enum = functools.partial(enummap, prefix='ripple::')
 LET = ripple_enum('ripple::LedgerEntryType')
 TER = ripple_enum('ripple::TER')
 STI = ripple_enum('ripple::SerializedTypeID')
+
+# from pprint import pprint
+# pprint(STI)

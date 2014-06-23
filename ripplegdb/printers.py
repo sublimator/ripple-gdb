@@ -16,9 +16,9 @@ import gdb.types
 # Ripplegdb
 
 from ripplegdb.base58 import base58_check_encode
-from ripplegdb.helpers import read_value, Proxy, hex_encode, moneyfmt
-from ripplegdb.types import TYPE_MAPPINGS, serialized_type_ptr
-from ripplegdb.values import read_value, iterate_vector
+from ripplegdb.helpers import Proxy, hex_encode, moneyfmt
+from ripplegdb.types import STI_TO_TYPE_MAPPING, SerializedType
+from ripplegdb.values import read_value, iterate_vector, read_vector
 
 ################################### REGISTRY ###################################
 
@@ -42,9 +42,6 @@ def register(name="", helper_name=None):
 
 def get(k, default=None):
     return registry.get(k, default)
-
-def to_str(v):
-    return str(v).encode('utf8')
 
 ################################################################################
 
@@ -77,15 +74,14 @@ pCurrency = functools.partial(pUint160, currency=True)
 pAccountID = functools.partial(pUint160, currency=False)
 
 def pSTAccount(val):
-    return pAccountID({'pn': val['value']['_M_impl']['_M_start']},
-        read_value=functools.partial(read_value, n=20))
+    pn = read_vector(val['value'])
+    return pAccountID({'pn': pn},read_value=lambda v: v)
 
 def pUintAll(val, read_value=read_value):
     return hex_encode((read_value(val['pn'])))
 
 def pstd_string(val):
     return val['_M_dataplus']['_M_p'].string()
-
 
 def STAmount_to_decimal(val):
     is_native   = val['mIsNative']
@@ -147,7 +143,7 @@ def NodeList(val):
     return ''.join(pNode(n, i) for i,n in enumerate(iterate_vector(val)))
 
 def path_state_flags(val):
-    flags = int(to_str(val))
+    flags = int(str(val))
     yeah = dict(account=0x01, currency=0x10, issuer=0x20)
     human = '|'.join(k for k in sorted(yeah) if flags & yeah[k])
     return human
@@ -155,11 +151,12 @@ def path_state_flags(val):
 def iterate_stobject_fields(val):
     # mData is a boost::ptr_vector implemented via std::vector `c_`
     for ptr in iterate_vector(val['mData']['c_']):
-        st_ptr = ptr.cast(serialized_type_ptr)
+        st_ptr = ptr.cast(SerializedType.pointer())
         field = st_ptr.dereference()['fName'].dereference()
-        sub_ptr = TYPE_MAPPINGS.get(str(field['fieldType']))
+        typeImpl = STI_TO_TYPE_MAPPING.get(str(field['fieldType']))
 
-        if sub_ptr is not None:
+        if typeImpl is not None:
+            sub_ptr = typeImpl.pointer()
             casted = st_ptr.cast(sub_ptr)
             if casted != 0 and st_ptr.dynamic_cast(sub_ptr):
                 fieldName = pstd_string(field['fieldName'])
@@ -189,12 +186,27 @@ def pNode(val, index=None):
        ix: {ix}
         t: %(uFlags)s
         a: %(account_)s
-        r: %(transferRate_)s
+       tr: %(transferRate_)s
       c/i: %(currency_)s/%(issuer_)s
       ofr: %(offerIndex_)s %(sleOffer)s
 """.format(ix=index)) % Proxy(val,
         sleOffer=node_offer,
         uFlags=path_state_flags)
+
+def pSTObject(value):
+    return pLedgerEntry(value)
+
+def pSTArray(value):
+    return "TODO: STArray"
+
+def pSTPathSet(value):
+    return "TODO: STPathSet"
+
+def pSTVector256(value):
+    return str(value['mValue'])
+
+def pSTVariableLength(value):
+    return str(value['value'])
 
 class RipplePrinter(gdb.printing.PrettyPrinter):
     on = True
@@ -207,6 +219,7 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::path::Currency' : pCurrency,
 
         'ripple::uint256' : pUintAll,
+        'ripple::Blob' : lambda v: hex_encode(bytes(read_vector(v['value']))),
 
         'ripple::STAmount':   pSTAmount,
         'ripple::STAccount':  pSTAccount,
@@ -218,6 +231,12 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::STUInt16':  lambda o: o['value'],
         'ripple::STUInt32':  lambda o: o['value'],
         'ripple::STUInt64':  lambda o: ("{0:0{1}x}".format(int(o['value']), 16)),
+
+        'ripple::STObject'  : pSTObject,
+        'ripple::STArray'  : pSTArray,
+        'ripple::STPathSet'  : pSTPathSet,
+        'ripple::STVector256'  : pSTVector256,
+        'ripple::STVariableLength'  : pSTVariableLength,
 
         'ripple::SerializedLedgerEntry':  pLedgerEntry,
 

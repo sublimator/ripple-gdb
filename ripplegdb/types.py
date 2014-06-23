@@ -42,7 +42,6 @@ TYPE_MAPPINGS = {
     'ripple::STI_VL' :  VL_ptr
 }
 
-
 CODE_LOOKUP = dict([ (getattr(gdb, k), k) for k in dir(gdb) if 
                    k.startswith('TYPE_CODE_')])
 

@@ -18,6 +18,7 @@ import gdb.types
 from ripplegdb.base58 import base58_check_encode
 from ripplegdb.helpers import read_value, Proxy, hex_encode, moneyfmt
 from ripplegdb.types import TYPE_MAPPINGS, serialized_type_ptr
+from ripplegdb.values import read_value, iterate_vector
 
 ################################### REGISTRY ###################################
 
@@ -140,7 +141,10 @@ PathState %(mIndex)s:
         pass:%(saOutPass)s
     nodes:
         %(nodes_)s
-""" % Proxy(val, uQuality=pQuality, saInReq=lambda v: v)
+""" % Proxy(val, uQuality=pQuality, nodes_= NodeList)
+
+def NodeList(val):
+    return ''.join(pNode(n, i) for i,n in enumerate(iterate_vector(val)))
 
 def path_state_flags(val):
     flags = int(to_str(val))
@@ -149,19 +153,15 @@ def path_state_flags(val):
     return human
 
 def iterate_stobject_fields(val):
-    vec_impl = val['mData']['c_']['_M_impl']
-    start = vec_impl['_M_start']
-
-    for i in range(int(vec_impl['_M_finish'] - start)):
-        ptr = start + i
-        st_ptr = ptr.dereference().cast(serialized_type_ptr)
+    # mData is a boost::ptr_vector implemented via std::vector `c_`
+    for ptr in iterate_vector(val['mData']['c_']):
+        st_ptr = ptr.cast(serialized_type_ptr)
         field = st_ptr.dereference()['fName'].dereference()
         sub_ptr = TYPE_MAPPINGS.get(str(field['fieldType']))
 
         if sub_ptr is not None:
-            dcasted = st_ptr.dynamic_cast(sub_ptr)
             casted = st_ptr.cast(sub_ptr)
-            if dcasted != 0 and casted != 0:
+            if casted != 0 and st_ptr.dynamic_cast(sub_ptr):
                 fieldName = pstd_string(field['fieldName'])
                 yield (fieldName, casted.dereference())
 
@@ -182,18 +182,19 @@ def node_offer(val):
     else:
         return '<empty>'
 
-def pNode(val):
-    return """
+def pNode(val, index=None):
+    # We should eventually use some kind of kick arse indentation aware templat
+    # ing language.
+    return ("""
+       ix: {ix}
         t: %(uFlags)s
         a: %(account_)s
+        r: %(transferRate_)s
       c/i: %(currency_)s/%(issuer_)s
       ofr: %(offerIndex_)s %(sleOffer)s
-
-""" % Proxy(val,
+""".format(ix=index)) % Proxy(val,
         sleOffer=node_offer,
-        currency_=pCurrency,
         uFlags=path_state_flags)
-
 
 class RipplePrinter(gdb.printing.PrettyPrinter):
     on = True

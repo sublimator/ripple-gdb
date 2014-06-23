@@ -72,11 +72,6 @@ def post_write(s, *args):
     gdb.write(s % args, gdb.STDOUT)
     gdb.flush(gdb.STDOUT)
 
-def read_value(val, n=None):
-    return (gdb.selected_inferior()
-               .read_memory(
-                    val.address, n or val.type.sizeof))
-
 class Proxy:
     def __init__(self, v, **kw):
         self.v=v

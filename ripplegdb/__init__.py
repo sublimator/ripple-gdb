@@ -22,6 +22,8 @@ printers
 commands
 funcs
 '''
+#reloadwatcher
+#websockets
 
 ##################################### INIT #####################################
 '''

@@ -76,7 +76,7 @@ $8 = 47.13359976517965/USD/rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B:(sfSendMax)
 
 ### Notes
 
-* This inlines std library pretty printers converted to work with Python
+* This inlines std library pretty printers converted to work with Python 3
 
 ### TODO
 

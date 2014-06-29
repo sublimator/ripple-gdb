@@ -182,13 +182,26 @@ def node_offer(val):
 def pNode(val, index=None):
     # We should eventually use some kind of kick arse indentation aware templat
     # ing language.
+
+    # tr: %(transferRate_)s
+    #    revRedeem:  %(saRevRedeem)s
+    #     revIssue:  %(saRevIssue)s
+    #   revDeliver:  %(saRevDeliver)s
+    #  saFwdRedeem:  %(saFwdRedeem)s
+    #   saFwdIssue:  %(saFwdIssue)s
+    # saFwdDeliver:  %(saFwdDeliver)s
+    # saOfferFunds:  %(saOfferFunds)s
+    #  saTakerPays:  %(saTakerPays)s
+    #  saTakerGets:  %(saTakerGets)s
+
     return ("""
        ix: {ix}
         t: %(uFlags)s
         a: %(account_)s
-       tr: %(transferRate_)s
       c/i: %(currency_)s/%(issuer_)s
+
       ofr: %(offerIndex_)s %(sleOffer)s
+
 """.format(ix=index)) % Proxy(val,
         sleOffer=node_offer,
         uFlags=path_state_flags)
@@ -203,10 +216,10 @@ def pSTPathSet(value):
     return "TODO: STPathSet"
 
 def pSTVector256(value):
-    return str(value['mValue'])
+    return repr(list(map(str, iterate_vector(value['mValue'])))).replace("'", '')
 
 def pSTVariableLength(value):
-    return str(value['value'])
+    return value['value']
 
 class RipplePrinter(gdb.printing.PrettyPrinter):
     on = True
@@ -218,6 +231,7 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::path::Account' : pAccountID,
         'ripple::path::Currency' : pCurrency,
 
+        'ripple::base_uint<256ul, void>' : pUintAll,
         'ripple::uint256' : pUintAll,
         'ripple::Blob' : lambda v: hex_encode(bytes(read_vector(v['value']))),
 
@@ -257,7 +271,10 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
             yield t.name, val
 
             if t.code == gdb.TYPE_CODE_PTR:
-                yield t.target().name, val.dereference()
+                try:
+                    yield t.target().name, val.dereference()
+                except Exception as e:
+                    print(e)
 
             yield gdb.types.get_basic_type(t).tag, val
 

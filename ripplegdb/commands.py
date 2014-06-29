@@ -2,7 +2,14 @@
 
 # Std Lib
 import os
+import readline
+
 from pprint import pprint as pp, pformat as pf
+from itertools import takewhile
+
+# Faulthandler
+import faulthandler
+import sys
 
 # Ggb
 import gdb
@@ -15,7 +22,15 @@ import ripplegdb
 
 PP = ripplegdb.printers.RipplePrinter
 
-################################################################################
+############################### SEGFAULT HANDLING ##############################
+
+# Installs a (perf expensive) trace
+if os.environ.get("RIPPLEGDB_FAULTHANDLER") is not None:
+    sys.stdout.fileno = lambda: 1
+    sys.stderr.fileno = lambda: 2
+    faulthandler.enable()
+
+#################################### HEPLERS ###################################
 
 def apply(f): return f()
 
@@ -39,8 +54,18 @@ def reload_ripplegdb(arg=None, from_tty=None):
     try:
         ripplegdb.helpers.reload_module(ripplegdb)
     except:
-        delattr(ripplegdb, 'hook_remover')
-        ripplegdb.helpers.reload_module(ripplegdb)
+        try:
+            delattr(ripplegdb, 'hook_remover')
+        finally:
+            ripplegdb.helpers.reload_module(ripplegdb)
+
+@command('reset_readline')
+def reset_readline(arg=None, from_tty=None):
+    readline.set_pre_input_hook()
+    readline.set_startup_hook()
+    readline.set_completer()
+    readline.set_completion_display_matches_hook()
+    readline.clear_history()
 
 @apply
 def launch_ipython():
@@ -63,7 +88,25 @@ def launch_ipython():
 
     @command('ipy')
     def launch_ipython(arg, from_tty):
+        import IPython
+        n = readline.get_history_length()
+        history = (readline.get_history_item(i) for i in
+                   range(1, int(1e5) if n == -1 else n))
+        history = list(takewhile(lambda v: v is not None, history))
+        reset_readline()
+
+        ti = IPython.terminal.embed.InteractiveShellEmbed._instance
+
+        if ti is not None:
+            ti.init_readline()
+            ti.init_completer()
+
+        gdb.execute('set editing off')
         IPython.embed(user_ns=user_ns, user_module=ripplegdb)
+        # Reset the readline, and restore the history
+        reset_readline()
+        list(map(readline.add_history, history))
+        gdb.execute('set editing on')
 
     return launch_ipython
 

@@ -111,8 +111,8 @@ def pSTAmount(val):
     v = format_decimal(STAmount_to_decimal(val))
 
     field    = pstd_string(val['fName']['rawJsonName'])
-    currency = pCurrency(val['mCurrency'])
-    issuer   = pAccountID(val['mIssuer'])
+    currency = pCurrency(val['mIssue']['currency'])
+    issuer   = pAccountID(val['mIssue']['account'])
 
     if currency == 'XRP':
         ret = "%s/XRP%s" % (v, '' if issuer == '0' else issuer)

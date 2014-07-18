@@ -152,13 +152,30 @@ def iterate_stobject_fields(val):
     # mData is a boost::ptr_vector implemented via std::vector `c_`
     for ptr in iterate_vector(val['mData']['c_']):
         st_ptr = ptr.cast(SerializedType.pointer())
+
+        # This is nasty, ideally we could get a reference to this vtable address
+        # somehow. In any case, this works, where dynamic_cast was working
+        # before.
+
+        # The reason we filter, is because this will just be a base
+        # SerializedType. Which will have STI_NOTPRESENT, and thus typically
+        # getField*() will `if (id == STI_NOTPRESENT) return uint256 ()` In any
+        # case, we should only present fields, so we don't get confused by
+        # seeing, random bits of memory interpreted as a certain type.
+
+        # TODO:fix obviously
+        vt = st_ptr.dereference()['_vptr.SerializedType']
+        if "vtable for ripple::SerializedType" in str(vt):
+            continue
+
         field = st_ptr.dereference()['fName'].dereference()
         typeImpl = STI_TO_TYPE_MAPPING.get(str(field['fieldType']))
 
         if typeImpl is not None:
             sub_ptr = typeImpl.pointer()
             casted = st_ptr.cast(sub_ptr)
-            if casted != 0 and st_ptr.dynamic_cast(sub_ptr):
+
+            if casted != 0:
                 fieldName = pstd_string(field['fieldName'])
                 yield (fieldName, casted.dereference())
 
@@ -237,14 +254,14 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
 
         'ripple::STAmount':   pSTAmount,
         'ripple::STAccount':  pSTAccount,
-        'ripple::STHash256':  lambda o: pUintAll(o['value']),
-        'ripple::STHash160':  lambda o: pUint160(o['value']),
-        'ripple::STHash128':  lambda o: pUintAll(o['value']),
+        'ripple::STHash256':  lambda o: pUintAll(o['bitString_']),
+        'ripple::STHash160':  lambda o: pUint160(o['bitString_']),
+        'ripple::STHash128':  lambda o: pUintAll(o['bitString_']),
 
-        'ripple::STUInt8':  lambda o: o['value'],
-        'ripple::STUInt16':  lambda o: o['value'],
-        'ripple::STUInt32':  lambda o: o['value'],
-        'ripple::STUInt64':  lambda o: ("{0:0{1}x}".format(int(o['value']), 16)),
+        'ripple::STUInt8':  lambda o: o['value_'],
+        'ripple::STUInt16':  lambda o: o['value_'],
+        'ripple::STUInt32':  lambda o: o['value_'],
+        'ripple::STUInt64':  lambda o: ("{0:0{1}x}".format(int(o['value_']), 16)),
 
         'ripple::STObject'  : pSTObject,
         'ripple::STArray'  : pSTArray,

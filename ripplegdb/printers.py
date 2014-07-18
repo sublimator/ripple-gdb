@@ -189,6 +189,12 @@ def pLedgerEntry(val):
 def pLedgerEntryPointer(val):
     return pLedgerEntry(val['_M_ptr'].dereference())
 
+def pOffer(val):
+    le = val['m_entry']['_M_ptr'].dereference()
+    fields = pLedgerEntry(le)
+    return "\n%s\nindex: %s\nquality: (pay:%s,get=1)" % (
+        fields, le['mIndex'], val['m_quality'])
+
 def node_offer(val):
     v = pLedgerEntryPointer(val)
     if v:
@@ -270,6 +276,8 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::STVariableLength'  : pSTVariableLength,
 
         'ripple::SerializedLedgerEntry':  pLedgerEntry,
+        'ripple::core::Quality':  lambda o: pQuality(o['m_value']),
+        'ripple::core::Offer':  pOffer,
 
         'ripple::PathState':  pPathState,
         'ripple::path::Node': pNode

@@ -159,9 +159,9 @@ def iterate_stobject_fields(val):
 
         # The reason we filter, is because this will just be a base
         # SerializedType. Which will have STI_NOTPRESENT, and thus typically
-        # getField*() will `if (id == STI_NOTPRESENT) return uint256 ()` In any
-        # case, we should only present fields, so we don't get confused by
-        # seeing, random bits of memory interpreted as a certain type.
+        # getField*() will `if (id == STI_NOTPRESENT) return $default()` In any
+        # case, we should only show `present` fields, so we don't get confused by
+        # seeing random bits of memory interpreted as a certain type.
 
         # TODO:fix obviously
         vt = st_ptr.dereference()['_vptr.SerializedType']

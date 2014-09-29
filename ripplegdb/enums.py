@@ -8,14 +8,18 @@ import gdb
 
 #################################### HELPERS ###################################
 
-def enummap(name, prefix=None):
+def enummap(the_enum, prefix=None, int_keys = True):
+    if isinstance(the_enum, str):
+        the_enum = gdb.lookup_type(the_enum)
+
     mapping = dict()
-    for f in gdb.lookup_type(name).fields():
+    for f in the_enum.fields():
         symbolic = f.name
         if prefix is not None:
             symbolic = symbolic.replace(prefix, '')
-        
-        mapping[f.enumval] = symbolic
+
+        if int_keys:
+            mapping[f.enumval] = symbolic
         mapping[symbolic] = f.enumval
     return mapping
 

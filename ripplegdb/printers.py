@@ -19,6 +19,7 @@ from ripplegdb.base58 import base58_check_encode
 from ripplegdb.helpers import Proxy, hex_encode, moneyfmt
 from ripplegdb.types import STI_TO_TYPE_MAPPING, SerializedType
 from ripplegdb.values import read_value, iterate_vector, read_vector
+from ripplegdb.enums import LET, TER, TXT
 
 ################################### REGISTRY ###################################
 
@@ -84,14 +85,19 @@ def pstd_string(val):
     return val['_M_dataplus']['_M_p'].string()
 
 def STAmount_to_decimal(val):
+    '''
+
+    We make a Decimal via crafting a constructor string, rather than doing
+    calculations, that way we don't lose any accuracy.
+
+    '''
+
     is_native   = val['mIsNative']
     is_negative = val['mIsNegative']
     mantissa    = val['mValue']
     exponent    = -6 if is_native else int(val['mOffset'])
     sign        = '-' if is_negative else '+'
 
-    # build up a list of the components
-    # ${sign}${mantissa}e$exponent
     v = Decimal(''.join(map(str, [sign, mantissa, 'e', exponent])))
 
     return v
@@ -102,12 +108,6 @@ def format_decimal(d):
     return moneyfmt(d, places=32)
 
 def pSTAmount(val):
-    '''
-
-    We calculate a float creating a constructor string, rather than doing
-    calculations, that way we don't lose any accuracy.
-
-    '''
     v = format_decimal(STAmount_to_decimal(val))
 
     field    = pstd_string(val['fName']['rawJsonName'])
@@ -157,11 +157,11 @@ def iterate_stobject_fields(val):
         # somehow. In any case, this works, where dynamic_cast was working
         # before.
 
-        # The reason we filter, is because this will just be a base
+        # The reason we filter is because this will just be a base
         # SerializedType. Which will have STI_NOTPRESENT, and thus typically
-        # getField*() will `if (id == STI_NOTPRESENT) return $default()` In any
-        # case, we should only show `present` fields, so we don't get confused by
-        # seeing random bits of memory interpreted as a certain type.
+        # getField*() will `if (id == STI_NOTPRESENT) return defaultValue ()` In
+        # any case, we should only show present fields, so we don't get confused
+        # by seeing random bits of memory interpreted as a certain type.
 
         # TODO:fix obviously
         vt = st_ptr.dereference()['_vptr.SerializedType']
@@ -184,7 +184,22 @@ def pLedgerEntry(val):
         return
     else:
         fields = sorted(iterate_stobject_fields(val))
-        return '\n'.join("%-20s%s" % (k+':',v) for (k,v) in fields )
+
+        def dorep(fieldName, value):
+            types = dict(LedgerEntryType=LET,
+                         TransactionType=TXT)
+
+            if fieldName in types:
+                try:
+                    n = int(str(value))
+                except:
+                    pass
+                else:
+                    return types[fieldName][n]
+
+            return str(value)
+
+        return '\n'.join("%-20s%s" % (k+':', dorep(k, v)) for (k,v) in fields )
 
 def pLedgerEntryPointer(val):
     return pLedgerEntry(val['_M_ptr'].dereference())
@@ -251,8 +266,6 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::uint160' : pUint160,
         'ripple::Account' : pAccountID,
         'ripple::Currency' : pCurrency,
-        'ripple::path::Account' : pAccountID,
-        'ripple::path::Currency' : pCurrency,
 
         'ripple::base_uint<256ul, void>' : pUintAll,
         'ripple::uint256' : pUintAll,
@@ -260,9 +273,9 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
 
         'ripple::STAmount':   pSTAmount,
         'ripple::STAccount':  pSTAccount,
-        'ripple::STHash256':  lambda o: pUintAll(o['bitString_']),
-        'ripple::STHash160':  lambda o: pUint160(o['bitString_']),
-        'ripple::STHash128':  lambda o: pUintAll(o['bitString_']),
+        'ripple::STBitString<256ul>':  lambda o: pUintAll(o['bitString_']),
+        'ripple::STBitString<160ul>':  lambda o: pUint160(o['bitString_']),
+        'ripple::STBitString<128ul>':  lambda o: pUintAll(o['bitString_']),
 
         'ripple::STUInt8':  lambda o: o['value_'],
         'ripple::STUInt16':  lambda o: o['value_'],
@@ -284,6 +297,9 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
     }
 
     def __init__(self):
+        for k in RipplePrinter.aliases:
+            gdb.lookup_type(k)
+
         super(RipplePrinter, self).__init__('RipplePrinter')
 
     def to_string(self):

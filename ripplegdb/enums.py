@@ -22,6 +22,7 @@ def enummap(name, prefix=None):
 ripple_enum = functools.partial(enummap, prefix='ripple::')
 
 LET = ripple_enum('ripple::LedgerEntryType')
+TXT = ripple_enum('ripple::TxType')
 TER = ripple_enum('ripple::TER')
 STI = ripple_enum('ripple::SerializedTypeID')
 

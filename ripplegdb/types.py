@@ -7,10 +7,10 @@ import gdb
 SerializedType = gdb.lookup_type("ripple::SerializedType")
 
 STAmount = gdb.lookup_type("ripple::STAmount")
-STHash256 = gdb.lookup_type("ripple::STHash256")
-STHash160 = gdb.lookup_type("ripple::STHash160")
+STHash256 = gdb.lookup_type("ripple::STBitString<256ul>")
+STHash160 = gdb.lookup_type("ripple::STBitString<160ul>")
 STAccount = gdb.lookup_type("ripple::STAccount")
-STHash128 = gdb.lookup_type("ripple::STHash128")
+STHash128 = gdb.lookup_type("ripple::STBitString<128ul>")
 STUInt64 = gdb.lookup_type("ripple::STUInt64")
 STUInt32 = gdb.lookup_type("ripple::STUInt32")
 STUInt16 = gdb.lookup_type("ripple::STUInt16")

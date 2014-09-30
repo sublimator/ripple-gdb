@@ -3,9 +3,9 @@
 # Std Lib
 import os
 import readline
-import re
 import json
 
+from collections import OrderedDict
 from pprint import pprint as pp, pformat as pf
 from itertools import takewhile
 
@@ -19,7 +19,7 @@ from gdb import PARAM_ENUM
 
 # Ours
 import ripplegdb
-from ripplegdb.enums import TER, enummap
+from ripplegdb.enums import all_enums
 
 ################################### CONSTANTS ##################################
 
@@ -70,76 +70,22 @@ def reset_readline(arg=None, from_tty=None):
     readline.set_completion_display_matches_hook()
     readline.clear_history()
 
-##################################### TODO #####################################
-'''
-TODO: Move all this some where sensible. 
-
-What this does is dump all the fields to a json file so that they can be sucked
-by other client libs.
-
-'''
-
-def pstd_string(val):
-    return val['_M_dataplus']['_M_p'].string()
-
-def format_type(val):
-    return (int(val), str(val).replace('ripple::', ''))
-
-def SField_json(value, meta = lambda v: v):
-
-
-    f = dict(nth_of_type=int(value['fieldValue']),
-                is_signing_field=bool(value['signingField']),
-                type=format_type(value['fieldType']))
-    m = meta(int(value['fieldMeta']))
-    if m is not None:
-        f['meta'] = m
-    return f
-
-def get_SFields(meta=lambda v: v):
-    fieldsMap = gdb.parse_and_eval("ripple::knownCodeToField")
-    # Just cheat, and get the values via regex, rather than going rummaging
-    # in the map<>
-    return dict([(f.replace('ripple::sf', ''), SField_json (
-                    gdb.parse_and_eval(f), meta=meta)) for f in
-              re.findall('<(ripple::.*)>', str(fieldsMap))])
-
-def get_SFields_meta_enum():
-    field_meta_enum = gdb.parse_and_eval("ripple::SField::sMD_Never").type
-    return enummap(field_meta_enum, prefix='ripple::SField::', int_keys=False)
-
-def get_TER():
-    mapping = {}
-    for v in sorted([v for v in TER.values() if isinstance(v, int)]):
-        token = TER[v]
-        human = gdb.parse_and_eval("ripple::transHuman(%s)" % v)
-        mapping[token] = ( v, pstd_string(human) )
-    return mapping
-
 @command('dump_enums')
 def dump_enums(arg=None, from_tty=None):
-    d = {}
+    '''
 
-    d['TER'] = get_TER()
-    metas = d['SField_Meta_enum'] = get_SFields_meta_enum()
+    Dumps TxType, TER, LedgerEntryType, and fields to $HOME/rippled-enums.json
 
-    def flagit(n):
-        if n == metas['sMD_Default']:
-            return
+    This actually includes information that is stored in static storage maps and
+    the like.
 
-        if n == metas['sMD_Never']:
-            return ['sMD_Never']
+    '''
+    enums = all_enums()
 
-        return [k for k in metas if k != 'sMD_Default' and n & metas[k]]
-
-    d['fields'] = get_SFields(meta=flagit)
-
-    with open( os.environ.get('HOME') + '/enum-dumps.json', 'w') as fh:
-        json.dump(d, fh, indent=2)
+    with open( os.environ.get('HOME') + '/rippled-enums.json', 'w') as fh:
+        json.dump(enums, fh, indent=2)
 
     print ('OK')
-
-################################### END TODO ###################################
 
 @apply
 def launch_ipython():

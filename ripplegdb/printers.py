@@ -19,7 +19,7 @@ import gdb.types
 from ripplegdb.base58 import base58_check_encode
 from ripplegdb.helpers import Proxy, hex_encode, moneyfmt
 from ripplegdb.types import STI_TO_TYPE_MAPPING, SerializedType
-from ripplegdb.values import read_value, iterate_vector, read_vector
+from ripplegdb.values import read_value, iterate_vector, read_blob
 from ripplegdb.enums import LET, TER, TXT
 
 ################################### REGISTRY ###################################
@@ -76,7 +76,7 @@ pCurrency = functools.partial(pUint160, currency=True)
 pAccountID = functools.partial(pUint160, currency=False)
 
 def pSTAccount(val):
-    pn = read_vector(val['value'])
+    pn = read_blob(val['value'])
     return pAccountID({'pn': pn},read_value=lambda v: v)
 
 def pUintAll(val, read_value=read_value):
@@ -200,7 +200,7 @@ def pLedgerEntry(val):
 
             return str(value)
 
-        return '\n'.join("%-20s%s" % (k+':', dorep(k, v)) for (k,v) in fields )
+        return '\n' + '\n'.join("%-20s%s" % (k+':', dorep(k, v)) for (k,v) in fields )
 
 def pLedgerEntryPointer(val):
     return pLedgerEntry(val['_M_ptr'].dereference())
@@ -258,7 +258,7 @@ def pSTVector256(value):
     return repr(list(map(str, iterate_vector(value['mValue'])))).replace("'", '')
 
 def pSTVariableLength(value):
-    return value['value']
+    return hex_encode(read_blob(value['value']))
 
 def pJsonCZString(value):
     'represents an int index into an [] or a string index into a {}'
@@ -306,7 +306,7 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
 
         'ripple::base_uint<256ul, void>' : pUintAll,
         'ripple::uint256' : pUintAll,
-        'ripple::Blob' : lambda v: hex_encode(bytes(read_vector(v['value']))),
+        'ripple::Blob' : lambda v: hex_encode(read_blob(v)),
 
         'ripple::STAmount':   pSTAmount,
         'ripple::STAccount':  pSTAccount,

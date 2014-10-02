@@ -4,6 +4,7 @@
 import functools
 import os
 import re
+import json
 import struct
 import collections
 
@@ -259,11 +260,47 @@ def pSTVector256(value):
 def pSTVariableLength(value):
     return value['value']
 
+def pJsonCZString(value):
+    'represents an int index into an [] or a string index into a {}'
+    cstr_ = value['cstr_']
+    if cstr_ != 0:
+        return json.dumps(cstr_.string())
+    else:
+        return value['index_']
+
+def pJsonValue(value):
+    val = value['value_']
+    type_ = str(value['type_'])
+
+    if type_ == 'Json::stringValue':
+        return (val['string_'])
+    elif type_ == 'Json::nullValue':
+        return '"null"'
+    elif type_ == 'Json::intValue':
+        return int(val['int_'])
+    elif type_ == 'Json::uintValue':
+        return int(val['uint_'])
+    elif type_ == 'Json::realValue':
+        return float(val['real_'])
+    elif type_ == 'Json::stringValue':
+        return json.dumps(pstd_string(val['string_']))
+    elif type_ == 'Json::booleanValue':
+        return bool(val['bool_'])
+    elif type_ == 'Json::arrayValue':
+        return val['map_'].dereference()
+    elif type_ == 'Json::objectValue':
+        return val['map_'].dereference()
+    return 'holder'
+
 class RipplePrinter(gdb.printing.PrettyPrinter):
     on = True
 
     aliases = {
         'ripple::uint160' : pUint160,
+
+        'Json::Value::CZString' : pJsonCZString,
+        'Json::Value' : pJsonValue,
+
         'ripple::Account' : pAccountID,
         'ripple::Currency' : pCurrency,
 

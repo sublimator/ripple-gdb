@@ -9,6 +9,10 @@ from collections import OrderedDict
 # Gdb
 import gdb
 
+# Us
+from ripplegdb.libcpp import StdMapPrinter
+from ripplegdb.values import iterate_vector
+
 #################################### HELPERS ###################################
 
 def enummap(the_enum, prefix=None, int_keys = True):
@@ -83,15 +87,73 @@ def get_TER():
         mapping[token] = ( v, pstd_string(human) )
     return mapping
 
+def try_add_commands(d):
+    # Errrrkk .... :(
+    handlers = gdb.parse_and_eval("_ZN6ripple3RPC12_GLOBAL__N_18HANDLERSE")
+    found = re.findall('\["(\w+)"\] = \{.*?'
+                        'role_ = ripple::Config::(\w+).*?'
+                        'condition_ = ripple::RPC::(\w+)'
+                        '.*?\}', str(handlers), re.DOTALL | re.MULTILINE)
+
+    d['commands'] = OrderedDict((t[0], dict(role=t[1],
+                                            condition=t[2])) for t in found)
+
+def unique_ptr_get(val):
+    return val['_M_t']['_M_head_impl'].dereference()
+
+def get_formats(format_type, entry_type, is_pointer=False):
+    # We use the rad iterator from here
+
+    # we can't seem to parse_and_eval so we use this lame hack ;)
+    formats = gdb.parse_and_eval('ripple::%s::getInstance()' % format_type)
+    # formats = gdb.history(-1)
+
+    if is_pointer:
+        formats = formats.dereference()
+
+    # Here we are by name
+    # std::map<std::string, Item*>;
+    std__map = formats['m_names']
+
+    Item = gdb.lookup_type('ripple::%s::Item' % format_type) .pointer()
+
+    formats = OrderedDict()
+    for i, it in enumerate(StdMapPrinter('crap', std__map).children()):
+        if i % 2 == 0:
+            key = pstd_string(it[1])
+            vals = formats[key] = OrderedDict()
+        else:
+            value = it[1].cast(Item).dereference()
+            nth = str(value['m_type'])
+
+            vals[entry_type] =  nth.replace('ripple::', '')
+            fields = vals['fields'] = OrderedDict()
+
+            for val in iterate_vector(value['elements']['mTypes']):
+                element = unique_ptr_get(val)
+                flags = str(element['flags']).replace('ripple::', '')
+                field = pstd_string(element['e_field'].referenced_value()['fieldName'])
+                fields[field] = flags
+
+    return formats
+
 def all_enums():
     metas = get_SFields_meta_enum()
 
     d = OrderedDict()
-    d['TransactionEngineResult'] = get_TER()
-    d['SField_Meta_enum'] = metas
     d['LedgerEntryType'] = symbolic_enum('ripple::LedgerEntryType')
     d['TransactionType'] = symbolic_enum('ripple::TxType')
     d['SerializedTypeID'] = symbolic_enum('ripple::SerializedTypeID')
+
+    d['SOE_Flags'] = symbolic_enum('ripple::SOE_Flags')
+    d['transactions'] = get_formats('TxFormats', 'TransactionType')
+    d['ledger_entries'] = get_formats('LedgerFormats', 'LedgerEntryType',
+                                    is_pointer=1)
+
+    #d['commands'] =
+    try_add_commands(d)
+    d['TransactionEngineResult'] = get_TER()
+    d['SField_Meta_enum'] = metas
 
     def flagit(n):
         if n == metas['sMD_Default']:

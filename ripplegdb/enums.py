@@ -101,15 +101,12 @@ def try_add_commands(d):
 def unique_ptr_get(val):
     return val['_M_t']['_M_head_impl'].dereference()
 
-def get_formats(format_type, entry_type, is_pointer=False):
+def get_formats(format_type, entry_type):
     # We use the rad iterator from here
 
     # we can't seem to parse_and_eval so we use this lame hack ;)
     formats = gdb.parse_and_eval('ripple::%s::getInstance()' % format_type)
     # formats = gdb.history(-1)
-
-    if is_pointer:
-        formats = formats.dereference()
 
     # Here we are by name
     # std::map<std::string, Item*>;
@@ -147,8 +144,7 @@ def all_enums():
 
     d['SOE_Flags'] = symbolic_enum('ripple::SOE_Flags')
     d['transactions'] = get_formats('TxFormats', 'TransactionType')
-    d['ledger_entries'] = get_formats('LedgerFormats', 'LedgerEntryType',
-                                    is_pointer=1)
+    d['ledger_entries'] = get_formats('LedgerFormats', 'LedgerEntryType')
 
     #d['commands'] =
     try_add_commands(d)

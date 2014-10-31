@@ -64,16 +64,19 @@ def SField_json(value, meta = lambda v: v):
 
 def get_SFields(meta=lambda v: v):
     fieldsMap = gdb.parse_and_eval("ripple::knownCodeToField")
+    fields = []
+
+    for i, c in enumerate(StdMapPrinter('codes', fieldsMap).children()):
+        if i % 2 == 1:
+            fields.append(
+                ( pstd_string(c[1]['rawJsonName']),
+                  SField_json(c[1], meta=meta) ) )
 
     def make_dict(items):
         sort_key = lambda i: (i[1]['type'],  i[1]['nth_of_type'])
         return OrderedDict(sorted(items, key=sort_key))
 
-    # Just cheat, and get the values via regex, rather than going rummaging in
-    # the map<>
-    return make_dict([(f.replace('ripple::sf', ''), SField_json (
-                       gdb.parse_and_eval(f), meta=meta)) for f in
-                       re.findall('<(ripple::.*)>', str(fieldsMap))])
+    return make_dict(fields)
 
 def get_SFields_meta_enum():
     field_meta_enum = gdb.parse_and_eval("ripple::SField::sMD_Never").type
@@ -102,8 +105,6 @@ def unique_ptr_get(val):
     return val['_M_t']['_M_head_impl'].dereference()
 
 def get_formats(format_type, entry_type):
-    # We use the rad iterator from here
-
     # we can't seem to parse_and_eval so we use this lame hack ;)
     formats = gdb.parse_and_eval('ripple::%s::getInstance()' % format_type)
     # formats = gdb.history(-1)

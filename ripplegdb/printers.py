@@ -257,7 +257,7 @@ def pSTPathSet(value):
 def pSTVector256(value):
     return repr(list(map(str, iterate_vector(value['mValue'])))).replace("'", '')
 
-def pSTVariableLength(value):
+def pSTBlob(value):
     return hex_encode(read_blob(value['value']))
 
 def pJsonCZString(value):
@@ -323,9 +323,9 @@ class RipplePrinter(gdb.printing.PrettyPrinter):
         'ripple::STArray'  : pSTArray,
         'ripple::STPathSet'  : pSTPathSet,
         'ripple::STVector256'  : pSTVector256,
-        'ripple::STVariableLength'  : pSTVariableLength,
+        'ripple::STBlob'  : pSTBlob,
 
-        'ripple::SerializedLedgerEntry':  pLedgerEntry,
+        'ripple::STLedgerEntry':  pLedgerEntry,
         'ripple::core::Quality':  lambda o: pQuality(o['m_value']),
         'ripple::core::Offer':  pOffer,
 

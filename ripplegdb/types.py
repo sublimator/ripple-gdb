@@ -4,7 +4,7 @@ import gdb
 
 ################################### CONSTANTS ##################################
 
-SerializedType = gdb.lookup_type("ripple::SerializedType")
+SerializedType = gdb.lookup_type("ripple::STBase")
 
 STAmount = gdb.lookup_type("ripple::STAmount")
 STHash256 = gdb.lookup_type("ripple::STBitString<256ul>")
@@ -19,7 +19,7 @@ STObject  =  gdb.lookup_type('ripple::STObject')
 STArray  =  gdb.lookup_type('ripple::STArray')
 STPathSet  =  gdb.lookup_type('ripple::STPathSet')
 STVector256  =  gdb.lookup_type('ripple::STVector256')
-STVariableLength = gdb.lookup_type("ripple::STVariableLength")
+STBlob = gdb.lookup_type("ripple::STBlob")
 
 STI_TO_TYPE_MAPPING = {
     'ripple::STI_UINT8':     STUInt8,
@@ -31,7 +31,7 @@ STI_TO_TYPE_MAPPING = {
     'ripple::STI_HASH256':   STHash256,
     'ripple::STI_AMOUNT':    STAmount,
     'ripple::STI_ACCOUNT':   STAccount,
-    'ripple::STI_VL':        STVariableLength,
+    'ripple::STI_VL':        STBlob,
     'ripple::STI_OBJECT':    STObject,
     'ripple::STI_ARRAY':     STArray,
     'ripple::STI_PATHSET' :  STPathSet,
